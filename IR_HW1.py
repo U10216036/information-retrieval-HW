@@ -8,9 +8,14 @@ import pandas as pd
 import numpy as np
 import seaborn as sns 
 import re
+import math
+import matplotlib.pyplot as plt
 
 percision_final = [0,0,0,0,0,0,0,0,0,0,0]
 APList = []
+DCG_List = [0]*2265
+IDCG_List = [0]*2265
+NDCG_List = []
 
 def getNumofResultsTrainSetQuery(path,startRow):
     ResultsTrainSet = pd.read_csv(path,sep = '\n',encoding = 'utf-8',skiprows = startRow,nrows = 0)
@@ -92,7 +97,7 @@ def plot():
         }
     )
     sns.factorplot(data = query_df, x="Recall", y="Percision", ci = None,color="#5599FF")
-                   
+    plt.show()               
                    
 def calculateAP(percision_List):
     sum = 0
@@ -102,6 +107,43 @@ def calculateAP(percision_List):
         count+=1
     print(count)
     APList.append(sum/count)
+
+def calculateDCGandIDCG(gain_List):
+    DCG_List_tmp = gain_List[:]
+    IDCG_List_tmp = gain_List[:]
+    IDCG_List_tmp.sort(reverse = True)
+    
+    for i in range(1,len(IDCG_List_tmp)):
+        if(i==1):
+            DCG_List_tmp[i]+=DCG_List_tmp[i-1]
+            IDCG_List_tmp[i]+=IDCG_List_tmp[i-1]
+        else:
+            DCG_List_tmp[i]+=(DCG_List_tmp[i]/math.log2(i)+DCG_List_tmp[i-1])
+            IDCG_List_tmp[i]+=(IDCG_List_tmp[i]/math.log2(i)+IDCG_List_tmp[i-1])
+    for k in range(len(DCG_List_tmp)):
+        DCG_List[k] += DCG_List_tmp[k]
+        IDCG_List[k]+= IDCG_List_tmp[k]
+    
+    
+def plotNDCG():
+    for i in range(len(DCG_List)):
+        NDCG_List.append(DCG_List[i]/IDCG_List[i])
+    sns.set(style="darkgrid")
+    docNum = range(2265)
+    df = pd.DataFrame.from_dict(
+        {"docNum": docNum,
+         "NDCG": NDCG_List
+        }
+    )
+    plt.plot( 'docNum', 'NDCG', data=df, color='mediumvioletred')
+    plt.show()
+    #sns.factorplot(data = df, x="docNum", y="NDCG", ci = None,color="#5599FF",kind="point",size=20)
+
+    '''
+    for i in range(len(xticks)):
+        if i%100!=0:
+            xticks[i].set_visible(False)
+    '''
     
 def printMAP():
     sum = 0
@@ -115,17 +157,20 @@ def readFile():
     startRowR = 0
     startRowA = 0
     for count in range(0, 16):
-        numOfResultsQuery = getNumofResultsTrainSetQuery('C:\\Users\owner\Desktop\IRHW\ResultsTrainSet.txt',startRowR)
-        numOfAssessmentQuery = getNumofAssessmentTrainSet('C:\\Users\owner\Desktop\IRHW\AssessmentTrainSet.txt',startRowA)
-        qrList = readResultsTrainSetQuery('C:\\Users\owner\Desktop\IRHW\ResultsTrainSet.txt',startRowR,numOfResultsQuery)
-        qaList = readNumofAssessmentTrainSet('C:\\Users\owner\Desktop\IRHW\AssessmentTrainSet.txt',startRowA,numOfAssessmentQuery)
+        numOfResultsQuery = getNumofResultsTrainSetQuery('ResultsTrainSet.txt',startRowR)
+        numOfAssessmentQuery = getNumofAssessmentTrainSet('AssessmentTrainSet.txt',startRowA)
+        qrList = readResultsTrainSetQuery('ResultsTrainSet.txt',startRowR,numOfResultsQuery)
+        qaList = readNumofAssessmentTrainSet('AssessmentTrainSet.txt',startRowA,numOfAssessmentQuery)
         count = 0
         percision_List = []
         recall_List = []
+        gain_List = []
         for i in range(qrList.size):
+            gain_List.append(0)
             for k in range(qaList.size):
                 if(qrList[i]==qaList[k]):
                     print(qrList[i])
+                    gain_List[i] = 1
                     count=count + 1
                     num = i+1
                     percision_List.append(count/num)
@@ -134,6 +179,7 @@ def readFile():
                     print("recall:",count/numOfAssessmentQuery)
         compare(percision_List,recall_List)
         calculateAP(percision_List)
+        calculateDCGandIDCG(gain_List)
         startRowR += (numOfResultsQuery + 2)
         startRowA += (numOfAssessmentQuery + 2)
 
@@ -142,6 +188,7 @@ def main():
     readFile()
     plot()
     printMAP()
+    plotNDCG()
 
 
 if __name__ == "__main__":
